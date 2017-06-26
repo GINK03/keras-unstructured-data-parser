@@ -1,7 +1,7 @@
 from keras.layers          import Lambda, Input, Dense, GRU, LSTM, RepeatVector
-from keras.models          import Model
 from keras.layers.core     import Flatten
 from keras.callbacks       import LambdaCallback 
+from keras.models          import Model
 from keras.optimizers      import SGD, RMSprop, Adam
 from keras.layers.wrappers import Bidirectional as Bi
 from keras.layers.wrappers import TimeDistributed as TD
@@ -21,7 +21,7 @@ import re
 
 
 timesteps   = 200
-inputs      = Input(shape=(timesteps, 128))
+inputs      = Input(shape=(timesteps, 100))
 encoded     = LSTM(512)(inputs)
 inputs_a    = inputs
 inputs_a    = Dense(2048)(inputs_a)
@@ -32,7 +32,7 @@ encoder     = Model(inputs, mul)
 
 x           = RepeatVector(timesteps)(mul)
 x           = Bi(LSTM(512, return_sequences=True))(x)
-decoded     = TD(Dense(128, activation='softmax'))(x)
+decoded     = TD(Dense(100, activation='softmax'))(x)
 
 parser      = Model(inputs, decoded)
 parser.compile(optimizer=Adam(), loss='categorical_crossentropy')
@@ -45,9 +45,45 @@ def callbacks(epoch, logs):
   print("logs", logs)
 
 def train():
-  c_i = pickle.loads( open("dataset/c_i.pkl", "rb").read() )
+  c_i = pickle.loads( open("char_index.pkl", "rb").read() )
   xss = []
   yss = []
-  with open("dataset/corpus.distinct.txt", "r") as f:
-    lines = [line for line in f]
+  for eg, name in enumerate(glob.glob("dataset/*.pkl")):
+    if eg > 1000:
+      break
+    #with open("dataset/corpus.distinct.txt", "r") as f:
+    mms, raw = pickle.loads( open( name, "rb" ).read() )
+    sss = eval( raw )
+    print( sss["txt"] )
+    print( mms, raw )
+   
+    x = [" "]*200
+    for i, m in enumerate(mms):
+      x[i] = m
+    xs = [ [0.0]*len(c_i) for i in range(200) ]
+    for i in range(len(x)):
+      xs[i][ c_i[x[i]] ] = 1.0
+    xs = list(reversed( xs ))
+
+    y = [" "]*200
+    for i, m in enumerate(raw):
+      y[i] = m
+    ys = [ [0.0]*len(c_i) for i in range(200) ]
+    for i in range(len(x)):
+      ys[i][ c_i[y[i]] ] = 1.0
+   
+    #print( xs )
+    #print( ys )
+
+    xss.append( xs )
+    yss.append( ys )
   
+  xss = np.array( xss )
+  yss = np.array( yss )
+
+  for i in range(10000):
+    parser.fit(xss, yss)
+    parser.save("models/%9f_%09d.h5"%(buff['loss'], i))
+if __name__ == '__main__':
+  if '--train' in sys.argv:
+    train() 
